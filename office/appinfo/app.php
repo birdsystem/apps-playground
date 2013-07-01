@@ -33,6 +33,4 @@ OCP\App::addNavigationEntry(array(
 	'name' => 'Office')
 );
 
-
-
-?>
+OC::$CLASSPATH['OCA\Office\Storage'] = 'office/lib/storage.php';
