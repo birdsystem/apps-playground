@@ -55,6 +55,9 @@ class MoviesManager {
 		$movies = $this->cache->searchByMime('video');
 
 		foreach($movies as $movie) {
+			if(substr($movie['path'], 0, 6) !== 'files/') {
+				continue;
+			}
 			$url = substr($movie['path'], 6);
 			$entry = array(
 				'url' => $url,
