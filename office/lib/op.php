@@ -49,8 +49,15 @@ class Op {
 	
 	public static function getOpsAfterJson($esId, $seq){
 		$ops = self::getOpsAfter($esId, $seq);
+		if (!is_array($ops)){
+			$ops = array();
+		}
 		$ops =  array_map(
-				function($x){return json_decode($x['opspec']);}, 
+				function($x){
+					$decoded = json_decode($x['opspec'], true);
+					$decoded['memberid'] = strval($decoded['memberid']);
+					return $decoded;
+				}, 
 				$ops
 		);
 		return $ops;
@@ -63,6 +70,14 @@ class Op {
 		$query = \OCP\DB::prepare('SELECT `opspec` FROM `*PREFIX*office_op`  WHERE `es_id`=? AND `seq`>? ORDER BY `seq` ASC');
 		$result = $query->execute(array($esId, $seq));
 		return $result->fetchAll();
+	}
+	
+	public static function removeCursor($esId, $memberId){
+		return self::add(
+				$esId, 
+				0,
+				'{"optype":"RemoveCursor","memberid":"'. $memberId .'","reason":"server-idle","timestamp":'. time() .'}'
+		);
 	}
 
 }

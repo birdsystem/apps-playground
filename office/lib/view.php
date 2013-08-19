@@ -30,14 +30,20 @@ class View extends \OC\Files\View{
 		return new \OC\Files\View('/' . $uid . self::OFFICE_DIRNAME);
 	}
 	
-	public static function storeDocument($uid, $path){
+	public static function storeDocument($uid, $filePath){
 		$proxyStatus = \OC_FileProxy::$enabled;
 		\OC_FileProxy::$enabled = false;
 		
 		$view = new \OC\Files\View('/' . $uid);
-		$newName = '/' . sha1($view->file_get_contents('/files' . $path)) . '.odt';
+		
+		$relPath = '/files' . $filePath;
+		if (!$view->file_exists($relPath)){
+			throw new \Exception('Original document doesn\'t exist any more');
+		}
+		
+		$newName = '/' . sha1($view->file_get_contents($path)) . '.odt';
 
-		$view->copy('/files' . $path, self::OFFICE_DIRNAME . $newName);
+		$view->copy($relPath, self::OFFICE_DIRNAME . $newName);
 		\OC_FileProxy::$enabled = $proxyStatus;
 		return $newName;
 	}

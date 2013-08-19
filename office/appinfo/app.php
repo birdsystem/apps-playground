@@ -24,6 +24,7 @@
 OCP\Util::addStyle( 'office', 'style');
 
 OCP\App::register(array('order' => 70, 'id' => 'office', 'name' => 'Office'));
+OCP\App::registerAdmin('office', 'settings');
 
 OCP\App::addNavigationEntry(array(
 	'id' => 'office_index', 
@@ -34,5 +35,6 @@ OCP\App::addNavigationEntry(array(
 );
 
 OC::$CLASSPATH['OCA\Office\Controller'] = 'office/ajax/controller.php';
+OC::$CLASSPATH['OCA\Office\UserController'] = 'office/ajax/userController.php';
 OC::$CLASSPATH['OCA\Office\Download\Simple'] = 'office/lib/download/simple.php';
 OC::$CLASSPATH['OCA\Office\Download\Range'] = 'office/lib/download/range.php';

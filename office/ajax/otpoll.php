@@ -45,6 +45,14 @@ try{
 	$command = $request->getParam('command');
 	switch ($command){
 		case 'query_memberdata_list':
+			$esId = $request->getParam('args/es_id');
+			$inactiveMembers = \OCA\Office\Member::cleanSession($esId);
+			if (is_array($inactiveMembers)){
+				foreach ($inactiveMembers as $member){
+					\OCA\Office\Op::removeCursor($esId, $member['member_id']);
+				}
+			}
+			
 			$ids = $request->getParam('args/member_ids');
 			$members = OCA\Office\Member::getMembersAsArray($ids);
 			$response["memberdata_list"] = array_map(
@@ -52,32 +60,15 @@ try{
 						$x['display_name'] = \OCP\User::getDisplayName($x['uid']);
 						
 						// Stub
-						$x['avatar_url'] = \OCP\Util::linkToRoute('office_avatar');
+						$x['avatar_url'] = \OCP\Util::linkToRoute('office_user_avatar');
 						return $x;
 					}, 
 					$members
 			);
 					
 			break;
-		case 'session_list':
-			OCA\Office\Controller::listSessions();
-			exit();
-			break;
-		case 'join_session':
-			 // should fail when session is non-existent
-			break;
-			OCA\Office\Controller::joinSession(array(
-				'es_id' => $request->getParam('args/es_id')
-			));
-			exit();
-			break;
-		case 'user_list':
-			$members = OCA\Office\Member::getMembersByEsId(
-					$request->getParam('args/es_id')
-			);
-			break;
 		case 'sync_ops':
-			$seqHead = $request->getParam('args/seq_head');
+			$seqHead = (string) $request->getParam('args/seq_head');
 			if (!is_null($seqHead)){
 				$esId = $request->getParam('args/es_id');
 				$memberId = $request->getParam('args/member_id');
@@ -85,6 +76,11 @@ try{
 				$hasOps = is_array($ops) && count($ops)>0;
 
 				$currentHead = OCA\Office\Op::getHeadSeq($esId);
+				try {
+					OCA\Office\Member::updateMemberActivity($memberId);
+				} catch (\Exception $e){
+					
+				}
 
 				// TODO handle the case ($currentHead == "") && ($seqHead != "")
 				if ($seqHead == $currentHead) {
