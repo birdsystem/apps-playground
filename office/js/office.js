@@ -39,10 +39,10 @@ var officeMain = {
 				var odfToolbarHtml =
 					'<div id="odf-toolbar">' +
 					'  <button id="odf_close">' +
-					    t('files_odfviewer', 'Close') +
+						t('files_odfviewer', 'Close') +
 					'  </button>' +
 					'  <button id="odf_invite">' +
-					    t('files_odfviewer', 'Invite') +
+						t('files_odfviewer', 'Invite') +
 					'  </button>' +
 					'  <span id="toolbar" class="claro"></span>' +
 					'</div>';
@@ -90,24 +90,28 @@ var officeMain = {
 		});
 	},
 	
-	startSession: function(filepath) {
+	startSession: function(fileid) {
 		"use strict";
+		console.log('starting session for fileid '+fileid);
 		if (officeMain.initialized === undefined) {
 			alert("WebODF Editor not yet initialized...");
 			return;
 		}
 
-		$.post(OC.Router.generate('office_session_start'),
-				{'path': filepath},
-		officeMain.initSession
-				);
+		$.post(
+			OC.Router.generate('office_session_start'),
+			{'fileid': fileid},
+			officeMain.initSession
+		);
 	},
 	
 	joinSession: function(esId) {
-		$.post(OC.Router.generate('office_session_join') + '/' + esId,
-				{},
-				officeMain.initSession
-				);
+		console.log('joining session '+esId);
+		$.post(
+			OC.Router.generate('office_session_join') + '/' + esId,
+			{},
+			officeMain.initSession
+		);
 	},
 	
 	updateInfo : function(){
@@ -116,18 +120,18 @@ var officeMain = {
 			fileIds.push($(e).attr('data-file'));
 		});
 		$.post(
-				OC.Router.generate('office_session_info'),
-				{items: fileIds},
-				function (response){
-					if (response && response.info && response.info.length){
-						for (var i=0;i<response.info.length;i++){
-							$('.documentslist li[data-file='+ response.info[i].file_id +'] .session-info').text(
-									t('office', 'Users in session:') 
-									+ response.info[i].users
-							);
-						}
+			OC.Router.generate('office_session_info'),
+			{items: fileIds},
+			function (response){
+				if (response && response.info && response.info.length){
+					for (var i=0;i<response.info.length;i++){
+						$('.documentslist li[data-file='+ response.info[i].file_id +'] .session-info').text(
+							t('office', 'Users in session:') 
+							+ response.info[i].users
+						);
 					}
 				}
+			}
 		);
 	},
 
@@ -162,35 +166,128 @@ var officeMain = {
 	}
 };
 
+
+/**
+ * TODO copy from files, move from files to core? load files.js?
+ * @param {type} mime
+ * @returns {getMimeIcon}
+ */
+function getMimeIcon(mime){
+	var def = new $.Deferred();
+	if(getMimeIcon.cache[mime]){
+		def.resolve(getMimeIcon.cache[mime]);
+	}else{
+		jQuery.getJSON( OC.filePath('office','ajax','mimeicon.php'), {mime: mime})
+		.done(function(data){
+			getMimeIcon.cache[mime]=data.path;
+			def.resolve(getMimeIcon.cache[mime]);
+		})
+		.error(function(jqXHR, textStatus, errorThrown){
+			console.log(textStatus + ': ' + errorThrown);
+			console.log(jqXHR);
+		});
+	}
+	return def;
+}
+getMimeIcon.cache={};
+
+// fill the albums from Gallery.images
+var officeDocuments = {
+	_documents: [],
+	_sessions: []
+};
+officeDocuments.loadDocuments = function () {
+	var self = this;
+	var def = new $.Deferred();
+	jQuery.getJSON(OC.filePath('office', 'ajax', 'documents.php'))
+		.done(function (data) {
+			self._documents = data.documents;
+			def.resolve();
+		})
+		.fail(function(data){
+			console.log(t('office','Failed to load documents.'));
+		});
+	return def;
+};
+officeDocuments.loadSessions = function () {
+	var self = this;
+	var def = new $.Deferred();
+	jQuery.getJSON(OC.filePath('office', 'ajax', 'sessions.php'))
+		.done(function (data) {
+			self._sessions = data.sessions;
+			def.resolve();
+		})
+		.fail(function(data){
+			console.log(t('office','Failed to load sessions.'));
+		});
+	return def;
+};
+officeDocuments.renderDocuments = function () {
+	
+	//remove all but template
+	$('.documentslist .document:not(.template)').remove();
+	
+	jQuery.each(this._documents, function(i,document){
+		var docElem = $('.documentslist .template').clone();
+		docElem.removeClass('template');
+		docElem.addClass('document');
+		docElem.attr('data-id', document.fileid);
+		
+		var a = docElem.find('a');
+		a.attr('href', OC.Router.generate('download',{file:document.path}));
+		a.find('label').text(document.name);
+		
+		getMimeIcon(document.mimetype).then(function(path){
+			a.css('background-image', 'url("'+path+'")');
+		});
+		$('.documentslist').append(docElem);
+		docElem.show();
+	});
+	jQuery.each(this._sessions, function(i,session){
+		var docElem = $('.documentslist .document[data-id="'+session.file_id+'"]');
+		if (docElem.length > 0) {
+			docElem.attr('data-esid', session.es_id);
+			docElem.find('label').after('<img class="svg session-active" src="'+OC.imagePath('core','places/contacts-dark')+'">');
+			docElem.addClass('session');
+		} else {
+			console.log('Could not find file '+session.file_id+' for session '+session.es_id);
+		}
+	});
+};
+
 $(document).ready(function() {
 	"use strict";
 	
-	$('.documentslist li').click(function(event) {
+	$('.documentslist').on('click', 'li', function(event) {
 		event.preventDefault();
 		if ($(this).attr('data-esid')){
 			officeMain.joinSession($(this).attr('data-esid'));
-		} else if ($(this).attr('data-file')){
-			officeMain.startSession($(this).attr('data-file'));
+		} else if ($(this).attr('data-id')){
+			officeMain.startSession($(this).attr('data-id'));
 		}
 	});
-	$('#odf_close').live('click', officeMain.onClose);
-	$('#odf_invite').live('click', officeMain.onInvite);
-	$('#invite-send').live('click', officeMain.sendInvite);
-	$('#invitee-list li').live('click', function(){
+	
+	$('#content').on('click', '#odf_close', officeMain.onClose);
+	$('#content').on('click', '#odf_invite', officeMain.onInvite);
+	$('#content').on('click', '#invite-send', officeMain.sendInvite);
+	$('#content').on('click', '#invitee-list li', function(){
 		$(this).remove();
 	});
 	
 	$('#inivite-input').autocomplete({
 		minLength: 1,
 		source: function(search, response) {
-			$.get(OC.Router.generate('office_user_search'), {search: $('#inivite-input').val()},
-			function(result) {
-				if (result.status == 'success' && result.data.length > 0) {
-					response(result.data);
-				} else {
-					response([t('core', 'No people found')]);
+			$.get(
+				OC.Router.generate('office_user_search'),
+				{search: $('#inivite-input').val()},
+				function(result) {
+					if (result.status === 'success' && result.data.length > 0) {
+						response(result.data);
+					} else {
+						response([t('core', 'No people found')]);
+					}
 				}
-			});
+			);
 		},
 		select: function(event, el) {
 			event.preventDefault();
@@ -207,6 +304,16 @@ $(document).ready(function() {
 			$('#invitee-list').prepend(item);
 		}
 	});
+
+	//TODO load list of files
+	jQuery.when(officeDocuments.loadDocuments(), officeDocuments.loadSessions())
+			.then(function(){
+				officeDocuments.renderDocuments();
+			});
+			//TODO show no docs please upload
+	//TODO load list of sessions, and add 'active' as icon overlay
+	//TODO when clicking on a document without a session initialize it
+	//TODO when ending a session as the last user close session?
 
 	OC.addScript('office', 'dojo-amalgamation', officeMain.onStartup);
 });
