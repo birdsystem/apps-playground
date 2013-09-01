@@ -30,9 +30,5 @@ OCP\App::addNavigationEntry(array(
 	'order' => 80, 
 	'href' => OCP\Util::linkTo('movies', 'index.php'), 
 	'icon' => OCP\Util::imagePath('movies', 'movies.png'), 
-	'name' => 'Movies')
+	'name' => 'Videos')
 );
-
-
-
-?>
